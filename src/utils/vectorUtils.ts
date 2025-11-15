@@ -33,29 +33,53 @@ export const formatVectorLiteral = (embedding: number[]): string => {
   // Format numbers to avoid scientific notation issues
   // PostgreSQL pgvector requires fixed decimal notation, not scientific notation
   const formattedNumbers = embedding.map(val => {
-    // Convert to string to check format
+    // Convert to string first to check if it's already in scientific notation
     let str = val.toString();
     
-    // If string contains scientific notation (e/E), we need to expand it
-    if (str.includes('e') || str.includes('E')) {
-      // Parse the exponent to determine how many decimal places we need
-      const match = str.match(/[eE]([+-]?\d+)$/);
-      if (match && match[1]) {
-        const exponent = parseInt(match[1]);
-        
-        if (exponent < 0) {
-          // For negative exponents (very small numbers), use toFixed with enough decimal places
-          // We need: abs(exponent) + significant digits (typically 15-17 for JS numbers)
-          const decimalPlaces = Math.min(Math.abs(exponent) + 20, 100); // Max 100 for toFixed
-          str = val.toFixed(decimalPlaces);
+    // Check if string contains scientific notation OR if number magnitude suggests it would
+    const absVal = Math.abs(val);
+    const hasScientificNotation = str.includes('e') || str.includes('E');
+    const isVerySmall = absVal > 0 && absVal < 1e-5; // More aggressive threshold
+    const isVeryLarge = absVal > 1e10;
+    
+    // Always format if it has scientific notation OR if magnitude suggests it needs formatting
+    if (hasScientificNotation || isVerySmall || isVeryLarge) {
+      if (hasScientificNotation) {
+        // Parse the exponent from the string
+        const match = str.match(/[eE]([+-]?\d+)$/);
+        if (match && match[1]) {
+          const exponent = parseInt(match[1]);
+          if (exponent < 0) {
+            // For negative exponents, use enough decimal places
+            const decimalPlaces = Math.min(Math.abs(exponent) + 25, 100);
+            str = val.toFixed(decimalPlaces);
+          } else {
+            str = val.toFixed(20);
+          }
         } else {
-          // For positive exponents (large numbers), toFixed should work fine
-          str = val.toFixed(20);
+          str = val.toFixed(50);
         }
-      } else {
-        // Fallback: use high precision
-        str = val.toFixed(50);
+      } else if (isVerySmall) {
+        // Calculate decimal places needed for very small numbers
+        // Use log10 to find the exponent
+        try {
+          const log10 = Math.log10(absVal);
+          const exponent = Math.floor(log10);
+          const decimalPlaces = Math.min(Math.abs(exponent) + 25, 100);
+          str = val.toFixed(decimalPlaces);
+        } catch {
+          // Fallback if log10 fails (shouldn't happen for finite numbers)
+          str = val.toFixed(50);
+        }
+      } else if (isVeryLarge) {
+        str = val.toFixed(10);
       }
+    }
+    
+    // Final check: ensure no scientific notation remains
+    if (str.includes('e') || str.includes('E')) {
+      // Force conversion using toFixed
+      str = val.toFixed(50);
     }
     
     // Remove trailing zeros after decimal point
@@ -72,9 +96,16 @@ export const formatVectorLiteral = (embedding: number[]): string => {
   // Join numbers with commas, no spaces - pgvector format: [0.1,0.2,0.3]
   const vectorString = `[${formattedNumbers.join(',')}]`;
   
-  // Validate format (should not contain quotes)
+  // Validate format (should not contain quotes or scientific notation)
   if (vectorString.includes("'") || vectorString.includes('"')) {
     throw new Error("Vector literal contains invalid characters");
+  }
+  
+  // CRITICAL: Ensure no scientific notation remains
+  if (vectorString.includes('e') || vectorString.includes('E')) {
+    console.error("ERROR: Vector literal still contains scientific notation!");
+    console.error("Sample values:", formattedNumbers.slice(0, 10));
+    throw new Error("Vector literal contains scientific notation which PostgreSQL cannot parse");
   }
   
   return vectorString;
