@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import prisma from "../config/database.js";
 import { embedText } from "../services/embed.service.js";
+import { formatVectorLiteral, buildVectorUpdateQuery } from "../utils/vectorUtils.js";
 
 export const embedFileChunks = async (req: Request, res: Response) => {
   try {
@@ -19,29 +20,41 @@ export const embedFileChunks = async (req: Request, res: Response) => {
     if (chunks.length === 0)
       return res.status(400).json({ message: "No chunks to embed" });
 
+    let embeddedCount = 0;
+    let skippedCount = 0;
+
     // Embed each chunk
     for (const chunk of chunks) {
-      const embedding = await embedText(chunk.text);
+      try {
+        const embedding = await embedText(chunk.text);
 
-      if (embedding.length === 0) {
-        console.warn(`Empty embedding for chunk ${chunk.id}, skipping`);
+        if (embedding.length === 0) {
+          console.warn(`Empty embedding for chunk ${chunk.id}, skipping`);
+          skippedCount++;
+          continue;
+        }
+
+        // Format as pgvector literal: [0.1,0.2,0.3] (unquoted)
+        const vectorLiteral = formatVectorLiteral(embedding);
+
+        // Build SQL query with vector literal interpolated directly (not as parameter)
+        // This prevents Prisma from wrapping it in quotes
+        const updateQuery = buildVectorUpdateQuery(vectorLiteral, chunk.id);
+
+        await prisma.$executeRawUnsafe(updateQuery);
+        embeddedCount++;
+
+      } catch (chunkError: any) {
+        console.error(`Error embedding chunk ${chunk.id}:`, chunkError);
+        skippedCount++;
         continue;
       }
-
-      // Convert array to pgvector format: '[1,2,3]'::vector
-      const vectorString = `[${embedding.join(',')}]`;
-
-      // Save embedding (pgvector) - using $executeRawUnsafe for vector type casting
-      await prisma.$executeRawUnsafe(
-        `UPDATE "Chunk" SET embedding = $1::vector WHERE id = $2`,
-        vectorString,
-        chunk.id
-      );
     }
 
     return res.status(200).json({
       message: "Embeddings created successfully",
-      embedded: chunks.length,
+      embedded: embeddedCount,
+      skipped: skippedCount,
     });
 
   } catch (err: any) {

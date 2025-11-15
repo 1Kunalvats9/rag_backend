@@ -1,4 +1,5 @@
 import prisma from "../config/database.js";
+import { formatVectorLiteral, buildVectorSearchQuery } from "../utils/vectorUtils.js";
 
 /**
  * Vector Service - Vector similarity search using pgvector
@@ -6,6 +7,9 @@ import prisma from "../config/database.js";
  * Note: This requires raw SQL because Prisma doesn't natively support pgvector operations.
  * The embedding field is marked as Unsupported("vector") in the schema, so we must use
  * raw SQL queries for vector similarity operations.
+ * 
+ * IMPORTANT: Vector literals are interpolated directly into SQL (not as parameters)
+ * to avoid Prisma wrapping them in quotes, which breaks pgvector.
  */
 
 export const searchSimilarChunks = async (
@@ -13,30 +17,24 @@ export const searchSimilarChunks = async (
   queryEmbedding: number[],
   topK: number = 5
 ) => {
-  // Convert array to pgvector format string: '[1,2,3]'
-  const vectorString = `[${queryEmbedding.join(',')}]`;
+  if (queryEmbedding.length === 0) {
+    throw new Error("Query embedding cannot be empty");
+  }
+
+  // Format as pgvector literal: [0.1,0.2,0.3] (unquoted)
+  const vectorLiteral = formatVectorLiteral(queryEmbedding);
   
-  // Use raw SQL for vector similarity search (pgvector <-> operator)
-  // This is necessary because Prisma doesn't support pgvector operations natively
-  // Cast parameter through text first, then to vector type
+  // Build SQL query with vector literal interpolated directly (not as parameter)
+  // This prevents Prisma from wrapping it in quotes
+  const searchQuery = buildVectorSearchQuery(vectorLiteral, userId, topK);
+
   const results = await prisma.$queryRawUnsafe<Array<{
     id: string;
+    userId: string;
+    fileId: string;
     text: string;
-    embedding: unknown; // Vector type, can't be properly typed
-  }>>(
-    `
-    SELECT id, "userId", "fileId", text, "createdAt"
-    FROM "Chunk"
-    WHERE "userId" = $1
-      AND embedding IS NOT NULL
-      AND array_length(embedding::text::float[], 1) > 0
-    ORDER BY embedding <-> ($2::text::vector)
-    LIMIT $3;
-  `,
-    userId,
-    vectorString,
-    topK
-  );
+    createdAt: Date;
+  }>>(searchQuery);
 
   return results;
 };
