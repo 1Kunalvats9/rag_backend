@@ -8,8 +8,8 @@ export const searchSimilarChunks = async (
   // Convert array to pgvector format string: '[1,2,3]'
   const vectorString = `[${queryEmbedding.join(',')}]`;
   
-  // Embed vector string directly in SQL to avoid parameter quoting issues
-  // Use parameterized query for userId and topK to prevent SQL injection
+  // Use same approach as embed controller - pass vectorString as parameter with ::vector cast
+  // This works because PostgreSQL accepts the string format when cast to vector type
   return await prisma.$queryRawUnsafe(
     `
     SELECT id, text, embedding
@@ -17,10 +17,11 @@ export const searchSimilarChunks = async (
     WHERE "userId" = $1
       AND embedding IS NOT NULL
       AND array_length(embedding::text::float[], 1) > 0
-    ORDER BY embedding <-> ${vectorString}::vector
-    LIMIT $2;
+    ORDER BY embedding <-> ($2::text::vector)
+    LIMIT $3;
   `,
     userId,
+    vectorString,
     topK
   );
 };
