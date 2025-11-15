@@ -1,15 +1,14 @@
-import { PDFParse } from "pdf-parse";
+import pdfParse from "pdf-parse";
 import cloudinary from "../config/cloudinary.js";
 
 export const extractPDF = async (buffer: Buffer): Promise<string> => {
   try {
-    const parser = new PDFParse({ data: buffer });
-    const result = await parser.getText();
-    await parser.destroy();
-    return result.text || "";
-  } catch (err) {
+    // pdf-parse expects a Buffer directly
+    const data = await pdfParse(buffer);
+    return data.text || "";
+  } catch (err: any) {
     console.error("PDF extraction error:", err);
-    return "";
+    throw new Error(`Failed to extract PDF: ${err.message || "Unknown error"}`);
   }
 };
 

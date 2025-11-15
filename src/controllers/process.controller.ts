@@ -23,14 +23,28 @@ export const processFile = async (req: Request, res: Response) => {
     let extractedText = "";
 
     // Detect file type
-    if (file.type.includes("pdf")) {
-      extractedText = await extractPDF(buffer);
-    } else if (file.type.includes("text")) {
-      extractedText = await extractTextFile(buffer);
-    } else if (file.type.startsWith("image/")) {
-      extractedText = await extractImage(file.url);
-    } else {
-      return res.status(400).json({ message: "Unsupported file type" });
+    try {
+      if (file.type.includes("pdf")) {
+        extractedText = await extractPDF(buffer);
+      } else if (file.type.includes("text")) {
+        extractedText = await extractTextFile(buffer);
+      } else if (file.type.startsWith("image/")) {
+        extractedText = await extractImage(file.url);
+      } else {
+        return res.status(400).json({ message: "Unsupported file type" });
+      }
+
+      // Validate extracted text
+      if (!extractedText || extractedText.trim().length === 0) {
+        return res.status(400).json({ 
+          message: "Could not extract text from file. The file may be empty, corrupted, or contain only images." 
+        });
+      }
+    } catch (extractError: any) {
+      console.error("Text extraction error:", extractError);
+      return res.status(400).json({ 
+        message: `Failed to extract text: ${extractError.message || "Unknown error"}` 
+      });
     }
 
     // Save text into Prisma
@@ -40,6 +54,13 @@ export const processFile = async (req: Request, res: Response) => {
     });
 
     const chunks = chunkText(extractedText, 500);
+    
+    // Ensure we have chunks to insert
+    if (chunks.length === 0) {
+      return res.status(400).json({ 
+        message: "No text chunks could be created from the extracted text" 
+      });
+    }
     for (const txt of chunks) {
       // Insert chunk with placeholder embedding (will be updated during embedding step)
       // Using raw SQL because embedding is Unsupported type in Prisma
