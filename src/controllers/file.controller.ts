@@ -12,23 +12,21 @@ export const uploadFile = async (req: Request, res: Response) => {
 
     const fileType = req.file.mimetype;
 
-    // Determine resource type based on file type
-    let resourceType: "auto" | "raw" | "image" = "auto";
-    if (fileType.includes("pdf") || fileType.includes("text")) {
-      resourceType = "raw"; // PDFs and text files should be raw
-    } else if (fileType.startsWith("image/")) {
-      resourceType = "image";
+    // Only accept text files for now
+    if (!fileType.includes("text") && !fileType.includes("plain")) {
+      return res.status(400).json({ 
+        message: "Only text files (.txt) are supported at this time. Please upload a text file." 
+      });
     }
 
-    // Upload to Cloudinary with proper resource type and unsigned upload
+    // Upload to Cloudinary as raw text file
     const uploadRes = await cloudinary.uploader.upload_stream(
       { 
-        resource_type: resourceType,
+        resource_type: "raw",
         folder: `rag/${user.userId}`,
         use_filename: true,
         unique_filename: true,
         overwrite: false,
-        // Don't use signed URLs - use public URLs that don't expire
         type: "upload",
         access_mode: "public"
       },

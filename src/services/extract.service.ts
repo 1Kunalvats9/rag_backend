@@ -1,40 +1,22 @@
-import { createRequire } from "module";
-import cloudinary from "../config/cloudinary.js";
-
-// Use createRequire to import CommonJS module in ESM context
-const require = createRequire(import.meta.url);
-const pdfParse = require("pdf-parse");
-
-export const extractPDF = async (buffer: Buffer): Promise<string> => {
-  try {
-    // pdf-parse expects a Buffer directly
-    const data = await pdfParse(buffer);
-    return data.text || "";
-  } catch (err: any) {
-    console.error("PDF extraction error:", err);
-    throw new Error(`Failed to extract PDF: ${err.message || "Unknown error"}`);
-  }
-};
+/**
+ * Extract Service - Text file extraction only
+ * 
+ * Simplified to handle only text files for now to avoid complexity
+ * with PDF parsing and image OCR that can cause timeouts.
+ */
 
 export const extractTextFile = async (buffer: Buffer): Promise<string> => {
-  return buffer.toString("utf-8");
-};
-
-export const extractImage = async (filePath: string): Promise<string> => {
   try {
-    // Cloudinary OCR (built in!)
-    const result: any = await cloudinary.uploader.upload(filePath, {
-      ocr: "adv_ocr",
-    });
-
-    const text =
-      result.info?.ocr?.adv_ocr?.data[0]?.textAnnotations
-        ?.map((item: any) => item.description)
-        .join(" ") || "";
-
+    console.log(`[Extract] Extracting text from buffer, size: ${buffer.length} bytes`);
+    
+    // Convert buffer to UTF-8 string
+    const text = buffer.toString("utf-8");
+    
+    console.log(`[Extract] Text extraction completed, extracted ${text.length} characters`);
+    
     return text;
-  } catch (err) {
-    console.error("Image OCR error:", err);
-    return "";
+  } catch (err: any) {
+    console.error("Text extraction error:", err);
+    throw new Error(`Failed to extract text: ${err.message || "Unknown error"}`);
   }
 };

@@ -2,8 +2,17 @@ import { embedText } from "./embed.service.js";
 import { searchSimilarChunks } from "./vector.service.js";
 import prisma from "../config/database.js";
 import { gemini } from "../config/gemini.js";
+import type { Response } from "express";
 
-export const generateRAGAnswer = async (userId: string, question: string) => {
+/**
+ * Generate RAG answer with streaming support
+ * Streams the response token by token using Gemini's streaming API
+ */
+export const generateRAGAnswerStream = async (
+  userId: string,
+  question: string,
+  res: Response
+): Promise<void> => {
   try {
     // Step 1: Embed the user's question
     const queryEmbedding = await embedText(question);
@@ -23,7 +32,10 @@ export const generateRAGAnswer = async (userId: string, question: string) => {
 
     // Check if we have any results
     if (!results || results.length === 0) {
-      return "I don't have any documents uploaded yet. Please upload and process some documents first, then generate embeddings for them.";
+      const noDocsMessage = "I don't have any documents uploaded yet. Please upload and process some documents first, then generate embeddings for them.";
+      res.write(`data: ${JSON.stringify({ content: noDocsMessage, done: true })}\n\n`);
+      res.end();
+      return;
     }
 
     const context = results.map((c: any) => c.text).join("\n\n");
@@ -42,34 +54,49 @@ ${question}
 ANSWER:
 `;
 
-    // Step 4: Call Gemini model
-    let answer: string;
+    // Step 4: Stream response from Gemini
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    let fullAnswer = "";
+
     try {
       const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const result = await model.generateContent(prompt);
-      answer = result.response.text();
-    } catch (geminiError: any) {
-      console.error("Gemini API error:", geminiError);
-      throw new Error(`Failed to generate answer: ${geminiError.message || "Unknown error"}`);
-    }
+      const result = await model.generateContentStream(prompt);
 
-    // Step 5: Save chat history
-    try {
-      await prisma.chatMessage.create({
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        if (chunkText) {
+          fullAnswer += chunkText;
+          // Send each chunk to client
+          res.write(`data: ${JSON.stringify({ content: chunkText, done: false })}\n\n`);
+        }
+      }
+
+      // Send final message indicating stream is complete
+      res.write(`data: ${JSON.stringify({ content: "", done: true })}\n\n`);
+      res.end();
+
+      // Step 5: Save chat history (async, don't wait)
+      prisma.chatMessage.create({
         data: {
           userId,
           question,
-          answer,
+          answer: fullAnswer,
         },
+      }).catch((dbError: any) => {
+        console.error("Failed to save chat history:", dbError);
       });
-    } catch (dbError: any) {
-      // Log but don't fail if chat history save fails
-      console.error("Failed to save chat history:", dbError);
-    }
 
-    return answer;
+    } catch (geminiError: any) {
+      console.error("Gemini API error:", geminiError);
+      res.write(`data: ${JSON.stringify({ error: `Failed to generate answer: ${geminiError.message || "Unknown error"}` })}\n\n`);
+      res.end();
+    }
   } catch (error: any) {
-    console.error("generateRAGAnswer error:", error);
-    throw error; // Re-throw to be handled by controller
+    console.error("generateRAGAnswerStream error:", error);
+    res.write(`data: ${JSON.stringify({ error: error.message || "Something went wrong" })}\n\n`);
+    res.end();
   }
 };
