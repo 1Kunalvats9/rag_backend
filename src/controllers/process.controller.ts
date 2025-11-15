@@ -41,11 +41,12 @@ export const processFile = async (req: Request, res: Response) => {
 
     const chunks = chunkText(extractedText, 500);
     for (const txt of chunks) {
-      // Insert chunk without embedding initially (embedding will be set during embedding step)
+      // Insert chunk with placeholder embedding (will be updated during embedding step)
       // Using raw SQL because embedding is Unsupported type in Prisma
+      // Using [0.0]::vector as placeholder (1 dimension) - will be replaced with actual embedding
       await prisma.$executeRawUnsafe(
         `INSERT INTO "Chunk" ("id", "userId", "fileId", "text", "embedding", "createdAt")
-         VALUES (gen_random_uuid(), $1, $2, $3, NULL, NOW())`,
+         VALUES (gen_random_uuid(), $1, $2, $3, '[0.0]'::vector, NOW())`,
         user.userId,
         fileId as string,
         txt
