@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: rag-backend
+    runtime: node
+    plan: starter
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        fromService:
+          type: web
+          name: rag-backend
+          property: port
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rag-database
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: HF_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: CLOUDINARY_CLOUD
+        sync: false
+      - key: CLOUDINARY_KEY
+        sync: false
+      - key: CLOUDINARY_SECRET
+        sync: false
+
+databases:
+  - name: rag-database
+    plan: starter
+    databaseName: ragdb
+    user: raguser
+    postgresMajorVersion: "15"
+
