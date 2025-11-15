@@ -30,8 +30,23 @@ export const formatVectorLiteral = (embedding: number[]): string => {
     throw new Error("Embedding array contains invalid numbers");
   }
   
+  // Format numbers to avoid scientific notation issues
+  // PostgreSQL pgvector can have issues with very small scientific notation values
+  const formattedNumbers = embedding.map(val => {
+    // For very small or very large numbers, use fixed notation
+    // Otherwise use the number as-is converted to string
+    if (Math.abs(val) < 1e-10 || Math.abs(val) > 1e10) {
+      // Use fixed notation with enough precision
+      const str = val.toFixed(20);
+      // Remove trailing zeros but keep the number
+      return str.replace(/\.?0+$/, '') || '0';
+    }
+    // For normal numbers, convert to string (handles decimals properly)
+    return val.toString();
+  });
+  
   // Join numbers with commas, no spaces - pgvector format: [0.1,0.2,0.3]
-  const vectorString = `[${embedding.join(',')}]`;
+  const vectorString = `[${formattedNumbers.join(',')}]`;
   
   // Validate format (should not contain quotes)
   if (vectorString.includes("'") || vectorString.includes('"')) {
@@ -60,7 +75,7 @@ export const buildVectorUpdateQuery = (
  * Safely interpolates a vector literal into a similarity search query
  * Escapes userId to prevent SQL injection
  * 
- * Result: SELECT ... ORDER BY embedding <-> '[0.1,0.2,0.3]'::vector LIMIT 5
+ * Result: SELECT ... ORDER BY embedding <-> CAST('[0.1,0.2,0.3]' AS vector) LIMIT 5
  */
 export const buildVectorSearchQuery = (
   vectorLiteral: string,
@@ -70,14 +85,17 @@ export const buildVectorSearchQuery = (
   const escapedUserId = escapeSqlString(userId);
   const limit = Math.max(1, Math.min(100, Math.floor(topK))); // Sanitize limit
   
-  // Vector literal is wrapped in single quotes and cast to vector type
+  // Use CAST to ensure proper vector type conversion
+  // Escape single quotes in vector literal if any (shouldn't happen but safety first)
+  const escapedVector = vectorLiteral.replace(/'/g, "''");
+  
   return `
     SELECT id, "userId", "fileId", text, "createdAt"
     FROM "Chunk"
     WHERE "userId" = '${escapedUserId}'
       AND embedding IS NOT NULL
       AND array_length(embedding::text::float[], 1) > 0
-    ORDER BY embedding <-> '${vectorLiteral}'::vector
+    ORDER BY embedding <-> CAST('${escapedVector}' AS vector)
     LIMIT ${limit};
   `.trim();
 };

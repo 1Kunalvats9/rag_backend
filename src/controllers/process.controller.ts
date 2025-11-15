@@ -17,8 +17,26 @@ export const processFile = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "File not found" });
     }
 
-    const response = await axios.get(file.url, { responseType: "arraybuffer" });
-    const buffer = Buffer.from(response.data);
+    // Download file from Cloudinary
+    let buffer: Buffer;
+    try {
+      const response = await axios.get(file.url, { 
+        responseType: "arraybuffer",
+        timeout: 30000, // 30 second timeout
+        validateStatus: (status) => status === 200, // Only accept 200 status
+      });
+      buffer = Buffer.from(response.data);
+    } catch (downloadError: any) {
+      console.error("File download error:", downloadError);
+      if (downloadError.response?.status === 401 || downloadError.response?.status === 403) {
+        return res.status(500).json({ 
+          message: "File access denied. The file URL may have expired or been restricted. Please re-upload the file." 
+        });
+      }
+      return res.status(500).json({ 
+        message: `Failed to download file: ${downloadError.message || "Unknown error"}` 
+      });
+    }
 
     let extractedText = "";
 
