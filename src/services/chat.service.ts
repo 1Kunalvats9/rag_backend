@@ -13,12 +13,20 @@ export const generateRAGAnswerStream = async (
   question: string,
   res: Response
 ): Promise<void> => {
+  // Set SSE headers first, before any operations
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  
   try {
     // Step 1: Embed the user's question
     const queryEmbedding = await embedText(question);
     
     if (!queryEmbedding || queryEmbedding.length === 0) {
-      throw new Error("Failed to generate embedding for question");
+      res.write(`data: ${JSON.stringify({ error: "Failed to generate embedding for question" })}\n\n`);
+      res.end();
+      return;
     }
 
     // Step 2: Retrieve top chunks using vector search
@@ -27,7 +35,10 @@ export const generateRAGAnswerStream = async (
       results = await searchSimilarChunks(userId, queryEmbedding, 5);
     } catch (vectorError: any) {
       console.error("Vector search error:", vectorError);
-      throw new Error(`Vector search failed: ${vectorError.message || "Unknown error"}`);
+      const errorMsg = `Vector search failed: ${vectorError.message || "Unknown error"}`;
+      res.write(`data: ${JSON.stringify({ error: errorMsg })}\n\n`);
+      res.end();
+      return;
     }
 
     // Check if we have any results
@@ -55,10 +66,6 @@ ANSWER:
 `;
 
     // Step 4: Stream response from Gemini
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
-
     let fullAnswer = "";
 
     try {
@@ -97,7 +104,17 @@ ANSWER:
     }
   } catch (error: any) {
     console.error("generateRAGAnswerStream error:", error);
-    res.write(`data: ${JSON.stringify({ error: error.message || "Something went wrong" })}\n\n`);
-    res.end();
+    console.error("Error stack:", error.stack);
+    
+    // Only send error if response hasn't been ended
+    if (!res.writableEnded) {
+      try {
+        res.write(`data: ${JSON.stringify({ error: error.message || "Something went wrong" })}\n\n`);
+        res.end();
+      } catch (writeError: any) {
+        console.error("Failed to write error to response:", writeError);
+        // Response might already be closed, ignore
+      }
+    }
   }
 };
