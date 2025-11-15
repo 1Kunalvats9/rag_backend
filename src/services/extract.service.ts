@@ -1,5 +1,9 @@
-import pdfParse from "pdf-parse";
+import { createRequire } from "module";
 import cloudinary from "../config/cloudinary.js";
+
+// Use createRequire to import CommonJS module in ESM context
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 export const extractPDF = async (buffer: Buffer): Promise<string> => {
   try {
