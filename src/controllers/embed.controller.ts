@@ -8,14 +8,19 @@ export const embedFileChunks = async (req: Request, res: Response) => {
     const { fileId } = req.params;
     const user = (req as any).user;
 
+    // Validate fileId exists
+    if (!fileId || typeof fileId !== "string") {
+      return res.status(400).json({ message: "File ID is required" });
+    }
+
     // Get file
-    const file = await prisma.file.findUnique({ where: { id: fileId as string } });
+    const file = await prisma.file.findUnique({ where: { id: fileId } });
     if (!file || file.userId !== user.userId) {
       return res.status(404).json({ message: "File not found" });
     }
 
     // Get chunks
-    const chunks = await prisma.chunk.findMany({ where: { fileId: fileId as string } });
+    const chunks = await prisma.chunk.findMany({ where: { fileId } });
 
     if (chunks.length === 0)
       return res.status(400).json({ message: "No chunks to embed" });

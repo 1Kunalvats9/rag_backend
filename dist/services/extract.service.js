@@ -1,34 +1,20 @@
-import { PDFParse } from "pdf-parse";
-import cloudinary from "../config/cloudinary.js";
-export const extractPDF = async (buffer) => {
-    try {
-        const parser = new PDFParse({ data: buffer });
-        const result = await parser.getText();
-        await parser.destroy();
-        return result.text || "";
-    }
-    catch (err) {
-        console.error("PDF extraction error:", err);
-        return "";
-    }
-};
+/**
+ * Extract Service - Text file extraction only
+ *
+ * Simplified to handle only text files for now to avoid complexity
+ * with PDF parsing and image OCR that can cause timeouts.
+ */
 export const extractTextFile = async (buffer) => {
-    return buffer.toString("utf-8");
-};
-export const extractImage = async (filePath) => {
     try {
-        // Cloudinary OCR (built in!)
-        const result = await cloudinary.uploader.upload(filePath, {
-            ocr: "adv_ocr",
-        });
-        const text = result.info?.ocr?.adv_ocr?.data[0]?.textAnnotations
-            ?.map((item) => item.description)
-            .join(" ") || "";
+        console.log(`[Extract] Extracting text from buffer, size: ${buffer.length} bytes`);
+        // Convert buffer to UTF-8 string
+        const text = buffer.toString("utf-8");
+        console.log(`[Extract] Text extraction completed, extracted ${text.length} characters`);
         return text;
     }
     catch (err) {
-        console.error("Image OCR error:", err);
-        return "";
+        console.error("Text extraction error:", err);
+        throw new Error(`Failed to extract text: ${err.message || "Unknown error"}`);
     }
 };
 //# sourceMappingURL=extract.service.js.map

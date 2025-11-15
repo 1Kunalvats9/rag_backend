@@ -1,1 +1,1 @@
-{"version":3,"file":"process.controller.d.ts","sourceRoot":"","sources":["../../src/controllers/process.controller.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,OAAO,EAAE,QAAQ,EAAE,MAAM,SAAS,CAAC;AAMjD,eAAO,MAAM,WAAW,GAAU,KAAK,OAAO,EAAE,KAAK,QAAQ,gDAmD5D,CAAC"}
+{"version":3,"file":"process.controller.d.ts","sourceRoot":"","sources":["../../src/controllers/process.controller.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,OAAO,EAAE,QAAQ,EAAE,MAAM,SAAS,CAAC;AAMjD,eAAO,MAAM,WAAW,GAAU,KAAK,OAAO,EAAE,KAAK,QAAQ,gDA4J5D,CAAC"}

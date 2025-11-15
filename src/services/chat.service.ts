@@ -91,7 +91,8 @@ ANSWER:
 
     } catch (geminiError: any) {
       console.error("Gemini API error:", geminiError);
-      res.write(`data: ${JSON.stringify({ error: `Failed to generate answer: ${geminiError.message || "Unknown error"}` })}\n\n`);
+      const errorMessage = `Failed to generate answer: ${geminiError.message || "Unknown error"}`;
+      res.write(`data: ${JSON.stringify({ error: errorMessage })}\n\n`);
       res.end();
     }
   } catch (error: any) {

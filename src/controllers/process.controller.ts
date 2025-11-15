@@ -9,10 +9,15 @@ export const processFile = async (req: Request, res: Response) => {
     const { fileId } = req.params;
     const user = (req as any).user;
 
+    // Validate fileId exists
+    if (!fileId || typeof fileId !== "string") {
+      return res.status(400).json({ message: "File ID is required" });
+    }
+
     console.log(`[Process] Starting file processing for fileId: ${fileId}`);
 
     const file = await prisma.file.findUnique({
-      where: { id: fileId as string },
+      where: { id: fileId },
     });
 
     if (!file || file.userId !== user.userId) {
@@ -84,7 +89,7 @@ export const processFile = async (req: Request, res: Response) => {
     // Save text into Prisma
     console.log(`[Process] Saving extracted text to database...`);
     await prisma.file.update({
-      where: { id: fileId as string },
+      where: { id: fileId },
       data: { text: extractedText },
     });
 
@@ -130,7 +135,7 @@ export const processFile = async (req: Request, res: Response) => {
               `INSERT INTO "Chunk" ("id", "userId", "fileId", "text", "embedding", "createdAt")
                VALUES (gen_random_uuid(), $1, $2, $3, '[0.0]'::vector, NOW())`,
               user.userId,
-              fileId as string,
+              fileId,
               txt
             );
           } catch (individualError: any) {

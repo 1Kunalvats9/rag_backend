@@ -7,9 +7,24 @@ export const uploadFile = async (req, res) => {
             return res.status(400).json({ message: "No file uploaded" });
         }
         const fileType = req.file.mimetype;
-        // Upload to Cloudinary
-        const uploadRes = await cloudinary.uploader.upload_stream({ resource_type: "auto", folder: `rag/${user.userId}` }, async (error, result) => {
+        // Only accept text files for now
+        if (!fileType.includes("text") && !fileType.includes("plain")) {
+            return res.status(400).json({
+                message: "Only text files (.txt) are supported at this time. Please upload a text file."
+            });
+        }
+        // Upload to Cloudinary as raw text file
+        const uploadRes = await cloudinary.uploader.upload_stream({
+            resource_type: "raw",
+            folder: `rag/${user.userId}`,
+            use_filename: true,
+            unique_filename: true,
+            overwrite: false,
+            type: "upload",
+            access_mode: "public"
+        }, async (error, result) => {
             if (error || !result) {
+                console.error("Cloudinary upload error:", error);
                 return res.status(500).json({ message: "Cloud upload failed" });
             }
             // Save metadata in Prisma
