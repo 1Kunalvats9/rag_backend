@@ -31,18 +31,42 @@ export const formatVectorLiteral = (embedding: number[]): string => {
   }
   
   // Format numbers to avoid scientific notation issues
-  // PostgreSQL pgvector can have issues with very small scientific notation values
+  // PostgreSQL pgvector requires fixed decimal notation, not scientific notation
   const formattedNumbers = embedding.map(val => {
-    // For very small or very large numbers, use fixed notation
-    // Otherwise use the number as-is converted to string
-    if (Math.abs(val) < 1e-10 || Math.abs(val) > 1e10) {
-      // Use fixed notation with enough precision
-      const str = val.toFixed(20);
-      // Remove trailing zeros but keep the number
-      return str.replace(/\.?0+$/, '') || '0';
+    // Convert to string to check format
+    let str = val.toString();
+    
+    // If string contains scientific notation (e/E), we need to expand it
+    if (str.includes('e') || str.includes('E')) {
+      // Parse the exponent to determine how many decimal places we need
+      const match = str.match(/[eE]([+-]?\d+)$/);
+      if (match && match[1]) {
+        const exponent = parseInt(match[1]);
+        
+        if (exponent < 0) {
+          // For negative exponents (very small numbers), use toFixed with enough decimal places
+          // We need: abs(exponent) + significant digits (typically 15-17 for JS numbers)
+          const decimalPlaces = Math.min(Math.abs(exponent) + 20, 100); // Max 100 for toFixed
+          str = val.toFixed(decimalPlaces);
+        } else {
+          // For positive exponents (large numbers), toFixed should work fine
+          str = val.toFixed(20);
+        }
+      } else {
+        // Fallback: use high precision
+        str = val.toFixed(50);
+      }
     }
-    // For normal numbers, convert to string (handles decimals properly)
-    return val.toString();
+    
+    // Remove trailing zeros after decimal point
+    if (str.includes('.')) {
+      str = str.replace(/\.?0+$/, '');
+      if (str === '' || str === '-') {
+        str = '0';
+      }
+    }
+    
+    return str;
   });
   
   // Join numbers with commas, no spaces - pgvector format: [0.1,0.2,0.3]
