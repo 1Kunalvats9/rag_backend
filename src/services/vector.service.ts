@@ -1,5 +1,13 @@
 import prisma from "../config/database.js";
 
+/**
+ * Vector Service - Vector similarity search using pgvector
+ * 
+ * Note: This requires raw SQL because Prisma doesn't natively support pgvector operations.
+ * The embedding field is marked as Unsupported("vector") in the schema, so we must use
+ * raw SQL queries for vector similarity operations.
+ */
+
 export const searchSimilarChunks = async (
   userId: string,
   queryEmbedding: number[],
@@ -8,11 +16,16 @@ export const searchSimilarChunks = async (
   // Convert array to pgvector format string: '[1,2,3]'
   const vectorString = `[${queryEmbedding.join(',')}]`;
   
-  // Use same approach as embed controller - pass vectorString as parameter with ::vector cast
-  // This works because PostgreSQL accepts the string format when cast to vector type
-  return await prisma.$queryRawUnsafe(
+  // Use raw SQL for vector similarity search (pgvector <-> operator)
+  // This is necessary because Prisma doesn't support pgvector operations natively
+  // Cast parameter through text first, then to vector type
+  const results = await prisma.$queryRawUnsafe<Array<{
+    id: string;
+    text: string;
+    embedding: unknown; // Vector type, can't be properly typed
+  }>>(
     `
-    SELECT id, text, embedding
+    SELECT id, "userId", "fileId", text, "createdAt"
     FROM "Chunk"
     WHERE "userId" = $1
       AND embedding IS NOT NULL
@@ -24,4 +37,6 @@ export const searchSimilarChunks = async (
     vectorString,
     topK
   );
+
+  return results;
 };
