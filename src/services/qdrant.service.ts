@@ -42,3 +42,38 @@ export const searchQdrant = async (
   }
 };
 
+export interface QdrantPoint {
+  id: string;
+  vector: number[];
+  payload: {
+    text: string;
+    chunkId?: string;
+    type?: string; // 'document' | 'user_info'
+    extractedInfo?: Record<string, any>;
+    createdAt?: string;
+    [key: string]: any;
+  };
+}
+
+/**
+ * Store information in Qdrant
+ * @param point - Point to upsert with id, vector, and payload
+ */
+export const upsertToQdrant = async (point: QdrantPoint): Promise<void> => {
+  try {
+    await qdrantClient.upsert(QDRANT_COLLECTION_NAME, {
+      wait: true,
+      points: [
+        {
+          id: point.id,
+          vector: point.vector,
+          payload: point.payload,
+        },
+      ],
+    });
+  } catch (error: any) {
+    console.error("Qdrant upsert error:", error);
+    throw new Error(`Failed to store information in Qdrant: ${error.message || "Unknown error"}`);
+  }
+};
+
