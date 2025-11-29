@@ -160,7 +160,7 @@ const config = {
       "value": "prisma-client-js"
     },
     "output": {
-      "value": "/Users/kunalvats/Downloads/coding/app development/rag/rag_backend/src/generated/prisma",
+      "value": "/Users/kunalvats/Downloads/coding/app_development/rag/rag_backend/src/generated/prisma",
       "fromEnvVar": null
     },
     "config": {
@@ -174,7 +174,7 @@ const config = {
       }
     ],
     "previewFeatures": [],
-    "sourceFilePath": "/Users/kunalvats/Downloads/coding/app development/rag/rag_backend/prisma/schema.prisma",
+    "sourceFilePath": "/Users/kunalvats/Downloads/coding/app_development/rag/rag_backend/prisma/schema.prisma",
     "isCustomOutput": true
   },
   "relativeEnvPaths": {

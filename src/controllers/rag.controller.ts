@@ -1,5 +1,6 @@
 import type { Request, Response } from "express";
 import { generateRAGAnswerStream } from "../services/chat.service.js";
+import { generateRAGAnswer } from "../services/rag.service.js";
 
 export const ragChat = async (req: Request, res: Response) => {
   try {
@@ -47,5 +48,44 @@ export const ragChat = async (req: Request, res: Response) => {
         error: process.env.NODE_ENV === "development" ? err.stack : undefined,
       });
     }
+  }
+};
+
+/**
+ * POST /rag endpoint - RAG query without authentication
+ * Returns strict JSON format: { answer, sources, confidence }
+ */
+export const ragQuery = async (req: Request, res: Response) => {
+  try {
+    const { query } = req.body;
+
+    // Validate query
+    if (!query || typeof query !== "string" || query.trim().length === 0) {
+      return res.status(400).json({ 
+        answer: "",
+        sources: [],
+        confidence: "low"
+      });
+    }
+
+    // Generate RAG answer
+    const result = await generateRAGAnswer(query.trim());
+
+    // Return strict JSON format
+    return res.status(200).json({
+      answer: result.answer,
+      sources: result.sources,
+      confidence: result.confidence,
+    });
+  } catch (err: any) {
+    console.error("RAG Query Error:", err);
+    console.error("Error stack:", err.stack);
+    
+    // Return error in the same format
+    return res.status(500).json({
+      answer: `Error processing query: ${err.message || "Unknown error"}`,
+      sources: [],
+      confidence: "low" as const,
+    });
   }
 };
