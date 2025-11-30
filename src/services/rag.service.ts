@@ -99,7 +99,8 @@ Examples:
 
       let answer = "";
       try {
-        const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const modelName = process.env.GEMINI_MODEL || "gemini-pro";
+        const model = gemini.getGenerativeModel({ model: modelName });
         const result = await model.generateContent(acknowledgmentPrompt);
         answer = result.response.text();
       } catch (geminiError: any) {
@@ -159,7 +160,8 @@ ANSWER:
   // Step 4: Send to Gemini
   let answer = "";
   try {
-    const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const modelName = process.env.GEMINI_MODEL || "gemini-pro";
+    const model = gemini.getGenerativeModel({ model: modelName });
     const result = await model.generateContent(prompt);
     const response = result.response;
     answer = response.text();

@@ -40,7 +40,8 @@ Output: {"type": "preference", "keyValuePairs": {"favorite_food": "pizza"}, "sum
 
 Only return valid JSON, no additional text.`;
     try {
-        const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const modelName = process.env.GEMINI_MODEL || "gemini-pro";
+        const model = gemini.getGenerativeModel({ model: modelName });
         const result = await model.generateContent(prompt);
         const response = result.response;
         const text = response.text().trim();
