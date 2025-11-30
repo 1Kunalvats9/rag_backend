@@ -78,7 +78,7 @@ Examples:
 - Generic: "I've saved that information for future reference. Thanks for sharing!"`;
             let answer = "";
             try {
-                const modelName = process.env.GEMINI_MODEL || "gemini-pro";
+                const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
                 const model = gemini.getGenerativeModel({ model: modelName });
                 const result = await model.generateContent(acknowledgmentPrompt);
                 answer = result.response.text();
@@ -134,7 +134,7 @@ ANSWER:
     // Step 4: Send to Gemini
     let answer = "";
     try {
-        const modelName = process.env.GEMINI_MODEL || "gemini-pro";
+        const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
         const model = gemini.getGenerativeModel({ model: modelName });
         const result = await model.generateContent(prompt);
         const response = result.response;

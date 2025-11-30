@@ -69,7 +69,7 @@ ANSWER:
     let fullAnswer = "";
 
     try {
-      const modelName = process.env.GEMINI_MODEL || "gemini-pro";
+      const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
       const model = gemini.getGenerativeModel({ model: modelName });
       const result = await model.generateContentStream(prompt);
 

@@ -56,7 +56,7 @@ ANSWER:
         // Step 4: Stream response from Gemini
         let fullAnswer = "";
         try {
-            const modelName = process.env.GEMINI_MODEL || "gemini-pro";
+            const modelName = process.env.GEMINI_MODEL || "gemini-2.5-flash";
             const model = gemini.getGenerativeModel({ model: modelName });
             const result = await model.generateContentStream(prompt);
             for await (const chunk of result.stream) {
