@@ -1,6 +1,8 @@
 import { embedText } from "./embed.service.js";
-import { searchQdrant } from "./qdrant.service.js";
+import { searchQdrant, upsertToQdrant } from "./qdrant.service.js";
+import { extractInformation } from "./extract.service.js";
 import { gemini } from "../config/gemini.js";
+import { randomUUID } from "crypto";
 /**
  * Calculate confidence based on similarity scores
  * @param scores - Array of similarity scores from Qdrant
@@ -35,13 +37,70 @@ export const generateRAGAnswer = async (query, topK = 5) => {
         throw new Error("Failed to generate embedding for query");
     }
     // Step 2: Search Qdrant for top-k relevant chunks
-    const searchResults = await searchQdrant(queryEmbedding, topK);
+    let searchResults;
+    try {
+        searchResults = await searchQdrant(queryEmbedding, topK);
+    }
+    catch (error) {
+        // If Qdrant search fails (e.g., collection doesn't exist), treat as no results
+        searchResults = [];
+    }
     if (!searchResults || searchResults.length === 0) {
-        return {
-            answer: "I don't have any relevant information to answer your question. Please ensure documents have been uploaded and indexed.",
-            sources: [],
-            confidence: "low",
-        };
+        // No results found - extract and save information from the query
+        try {
+            // Extract structured information from the query
+            const extractedInfo = await extractInformation(query);
+            // Generate a unique ID for this information
+            const infoId = randomUUID();
+            // Prepare text representation for storage
+            const textToStore = extractedInfo.summary || query;
+            // Store in Qdrant
+            await upsertToQdrant({
+                id: infoId,
+                vector: queryEmbedding,
+                payload: {
+                    text: textToStore,
+                    chunkId: infoId,
+                    type: "user_info",
+                    extractedInfo: extractedInfo.keyValuePairs,
+                    createdAt: new Date().toISOString(),
+                },
+            });
+            // Generate a friendly response acknowledging the information was saved
+            const acknowledgmentPrompt = `The user provided the following information: "${query}"
+
+Based on the extracted information, provide a friendly acknowledgment that you've saved this information. 
+Be conversational and natural. Keep it brief (1-2 sentences).
+
+Examples:
+- If they said "my name is kunal": "Got it! I've saved that your name is kunal. I'll remember that."
+- If they said "I like pizza": "Thanks for letting me know! I've noted that you like pizza."
+- Generic: "I've saved that information for future reference. Thanks for sharing!"`;
+            let answer = "";
+            try {
+                const model = gemini.getGenerativeModel({ model: "gemini-1.5-flash" });
+                const result = await model.generateContent(acknowledgmentPrompt);
+                answer = result.response.text();
+            }
+            catch (geminiError) {
+                // Fallback acknowledgment
+                answer = `I've saved that information: ${textToStore}. I'll remember it for future reference.`;
+            }
+            return {
+                answer: answer.trim(),
+                sources: [infoId],
+                confidence: "medium",
+            };
+        }
+        catch (saveError) {
+            console.error("Error saving information to Qdrant:", saveError);
+            // If saving fails, return a helpful message
+            return {
+                answer: "I don't have any relevant information to answer your question, and I encountered an issue saving your information. Please try again later.",
+                sources: [],
+                confidence: "low",
+            };
+        }
     }
     // Extract chunk texts and IDs
     const chunks = searchResults.map((result) => ({

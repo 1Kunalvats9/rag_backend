@@ -14,4 +14,21 @@ export interface QdrantSearchResult {
  * @returns Array of search results with id, score, and payload
  */
 export declare const searchQdrant: (queryEmbedding: number[], topK?: number) => Promise<QdrantSearchResult[]>;
+export interface QdrantPoint {
+    id: string;
+    vector: number[];
+    payload: {
+        text: string;
+        chunkId?: string;
+        type?: string;
+        extractedInfo?: Record<string, any>;
+        createdAt?: string;
+        [key: string]: any;
+    };
+}
+/**
+ * Store information in Qdrant
+ * @param point - Point to upsert with id, vector, and payload
+ */
+export declare const upsertToQdrant: (point: QdrantPoint) => Promise<void>;
 //# sourceMappingURL=qdrant.service.d.ts.map

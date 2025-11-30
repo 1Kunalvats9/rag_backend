@@ -1,5 +1,21 @@
 import { gemini } from "../config/gemini.js";
 
+/**
+ * Extract text from a file buffer (for text files)
+ * @param buffer - File buffer
+ * @returns Extracted text as string
+ */
+export const extractTextFile = async (buffer: Buffer): Promise<string> => {
+  try {
+    // Convert buffer to string (assuming UTF-8 encoding)
+    const text = buffer.toString("utf-8");
+    return text;
+  } catch (error: any) {
+    console.error("Text extraction error:", error);
+    throw new Error(`Failed to extract text from file: ${error.message || "Unknown error"}`);
+  }
+};
+
 export interface ExtractedInfo {
   type: "personal_info" | "fact" | "preference" | "other";
   keyValuePairs: Record<string, string>;
